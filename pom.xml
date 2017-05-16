@@ -9,8 +9,8 @@
     <version>7</version>
   </parent>
 
-  <groupId>org.robovm</groupId>
-  <version>2.5.0-3-SNAPSHOT</version>
+  <groupId>com.mobidevelop.robovm</groupId>
+  <version>2.5.0-4</version>
   <artifactId>robovm-soot</artifactId>
   <name>Soot</name>
   <packaging>jar</packaging>
@@ -114,7 +114,6 @@
           <target>1.7</target>
           <debug>true</debug>
           <optimize>true</optimize>
-          <showDeprecations>true</showDeprecations>
           <encoding>UTF-8</encoding>
           <excludes>
             <exclude>**/soot/AntTask.java</exclude>

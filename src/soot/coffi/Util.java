@@ -33,6 +33,9 @@ package soot.coffi;
 import soot.jimple.*;
 import java.util.*;
 import java.io.*;
+
+import soot.jimple.internal.ImmediateBox;
+import soot.robovm.RoboVMLocalAlias;
 import soot.tagkit.*;
 import soot.*;
 
@@ -827,52 +830,72 @@ swtch:
         }
     }
 
+    // RoboVM note: returns list of local's value boxes which usage STARTS at activeOriginalIndex
+    List<ValueBox> getLocalBoxesStartedAtCode(JimpleBody listBody) {
+        if (activeOriginalIndex == -1 || activeVariableTable == null)
+            return null;
+        List<Integer> indexes = activeVariableTable.getLocalVariablesDefinedAtCode(activeOriginalIndex);
+        if (indexes == null)
+            return null;
+        List<ValueBox> locals = new ArrayList<>();
+        for (Integer idx : indexes) {
+            int slotIndex = activeVariableTable.local_variable_table[idx].index;
+            locals.add(new ImmediateBox(getLocalForIndex(listBody, slotIndex)));
+        }
+        return locals;
+    }
+    // RoboVM note: End change.
+
     Local getLocalForIndex(JimpleBody listBody, int index)
     {
+        // RoboVM note: dkimitsa: this method was hardly reworked to work with local table var index instead of slot index
+
         String name = null;
         String debug_type = null;
         boolean assignedName = false;
-        if(useFaithfulNaming && activeVariableTable != null)
+        int variableByteCodeIdx = activeOriginalIndex;
+        if(variableByteCodeIdx != -1)
         {
-            if(activeOriginalIndex != -1)
-            {
+            // Feng asks: why this is necessary? it does wrong thing
+            //            for searching local variable names.
+            // It is going to be verified with plam.
+            if (isLocalStore)
+                variableByteCodeIdx++;
+            if (isWideLocalStore)
+                variableByteCodeIdx++;
+        }
 
-	      // Feng asks: why this is necessary? it does wrong thing
-	      //            for searching local variable names.
-	      // It is going to be verified with plam.
-                if(isLocalStore)
-                    activeOriginalIndex++;
-                if(isWideLocalStore)
-                    activeOriginalIndex++;
-
-                name = activeVariableTable.getLocalVariableName(activeConstantPool, index, activeOriginalIndex);
-                if (activeVariableTypeTable != null){
-               debug_type = activeVariableTypeTable.getLocalVariableType(activeConstantPool, index, activeOriginalIndex);
-               if (debug_type != null){
-               }
+        if (useFaithfulNaming && activeVariableTable != null && variableByteCodeIdx != -1)
+        {
+            name = activeVariableTable.getLocalVariableName(activeConstantPool, index, variableByteCodeIdx);
+            if (activeVariableTypeTable != null) {
+                debug_type = activeVariableTypeTable.getLocalVariableType(activeConstantPool, index, variableByteCodeIdx);
+                if (debug_type != null) {
                 }
-                if(name != null) 
-                    assignedName = true;
             }
-        }  
-        
+            if (name != null)
+                assignedName = true;
+        }
+
+        int localVariableIndex = -1;
+        if (activeVariableTable != null)
+            localVariableIndex = activeVariableTable.getLocalVariableIndex(index, variableByteCodeIdx);
+
         if(!assignedName)
             name = "l" + index;
 
-        if(declaresLocal(listBody, name))
-            return getLocal(listBody, name);
+        RoboVMLocalAlias slotLocal = declaresLocal(listBody, name) ? (RoboVMLocalAlias) getLocal(listBody, name) : null;
+        if(slotLocal != null)
+            return slotLocal.getAlias(localVariableIndex);
         else {
-            Local l = Jimple.v().newLocal(name,
-                UnknownType.v());
-            l.setIndex(index); // RoboVM note: Added
+            Local l = Jimple.v().newLocal(name, UnknownType.v());
+            l.setVariableTableIndex(localVariableIndex); // RoboVM note: Added
+            slotLocal = new RoboVMLocalAlias(l, localVariableIndex);
 
-            listBody.getLocals().add(l);
-            /*if (debug_type != null){
-                l.addTag(new DebugTypeTag(debug_type));
-            } */   
-
-            return l;
+            listBody.getLocals().add(slotLocal);
+            return slotLocal;
         }
+        // RoboVM note: end
     }
 
     /*

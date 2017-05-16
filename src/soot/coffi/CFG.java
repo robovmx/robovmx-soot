@@ -36,6 +36,7 @@ import java.util.*;
 
 import soot.*;
 import soot.jimple.*;
+import soot.robovm.RoboVmNopStmt;
 import soot.util.*;
 import soot.tagkit.*;
 
@@ -945,6 +946,8 @@ public class CFG {
     */
     public boolean jimplify(cp_info constant_pool[],int this_class, BootstrapMethods_attribute bootstrap_methods_attribute, JimpleBody listBody)
    {
+   	// ROBOVM: dkimitsa: logic is reworked to allocate all variables by Util.v().getLocalForIndex which will
+   	// keep variable table index
         this.bootstrap_methods_attribute = bootstrap_methods_attribute;
 		Util.v().setClassNameToAbbreviation(new HashMap());
 
@@ -961,9 +964,7 @@ public class CFG {
         //TypeArray.setClassManager(cm);
         //TypeStack.setClassManager(cm);
 
-        Set initialLocals = new ArraySet();
-
-        List parameterTypes = jmethod.getParameterTypes();
+	   List parameterTypes = jmethod.getParameterTypes();
 
         // Initialize nameToLocal which is an index*Type->Local map, which is used
         // to determine local in bytecode references.
@@ -974,7 +975,7 @@ public class CFG {
 
             Util.v().activeVariableTable = la;
             Util.v().activeVariableTypeTable = lt;
-            
+            Util.v().activeOriginalIndex = -1;
             Util.v().activeConstantPool = constant_pool;
             
             Type thisType = RefType.v(jmethod.getDeclaringClass().getName());
@@ -986,22 +987,7 @@ public class CFG {
             {
                 if(!isStatic)
                 {
-                    String name;
-                    
-                    if(!Util.v().useFaithfulNaming || la == null)
-                        name = "l0";
-                    else
-		    {
-                        name = la.getLocalVariableName(constant_pool, currentLocalIndex);
-			if (!Util.v().isValidJimpleName(name))
-			    name = "l0";
-		    }
-                        
-                    Local local = Jimple.v().newLocal(name, UnknownType.v());
-                    local.setIndex(0); // RoboVM note: Added
-
-                    listBody.getLocals().add(local);
-
+                    Local local = Util.v().getLocalForIndex(listBody, 0);
                     currentLocalIndex++;
 
                     units.add(Jimple.v().newIdentityStmt(local, Jimple.v().newThisRef(jmethod.getDeclaringClass().getType())));
@@ -1015,23 +1001,8 @@ public class CFG {
 
                 while(typeIt.hasNext())
                 {
-                    String name;
                     Type type = (Type) typeIt.next();
-
-                    if(!Util.v().useFaithfulNaming || la == null)
-                        name = "l" + currentLocalIndex;
-                    else
-		    {
-                        name = la.getLocalVariableName(constant_pool, currentLocalIndex);
-			if (!Util.v().isValidJimpleName(name))
-			    name = "l" + currentLocalIndex;
-		    }
-
-                    Local local = Jimple.v().newLocal(name, UnknownType.v());
-                    local.setIndex(currentLocalIndex); // RoboVM note: Added
-                    initialLocals.add(local);
-                    listBody.getLocals().add(local);
-
+                    Local local = Util.v().getLocalForIndex(listBody, currentLocalIndex);
                     units.add(Jimple.v().newIdentityStmt(local, Jimple.v().newParameterRef(type, argCount)));
 
                     if(type.equals(DoubleType.v()) ||
@@ -1090,7 +1061,6 @@ public class CFG {
      * @param constant_pool constant pool of ClassFile.
      * @param this_class constant pool index of the CONSTANT_Class_info object for
      * this' class.
-     * @param clearStacks if <i>true</i> semantic stacks will be deleted after
      * the process is complete.
      * @return <i>true</i> if all ok, <i>false</i> if there was an error.
      * @see CFG#jimplify(cp_info[], int)
@@ -1596,7 +1566,8 @@ public class CFG {
 	Code_attribute ca = method.locate_code_attribute();
         LocalVariableTable_attribute la = ca.findLocalVariableTable();
         if (la != null) {
-            for (local_variable_table_entry entry : la.local_variable_table) {
+            for (int localVariableIndex = 0; localVariableIndex < la.local_variable_table.length; localVariableIndex++) {
+            	local_variable_table_entry entry = la.local_variable_table[localVariableIndex];
                 if (!(constant_pool[entry.name_index] instanceof CONSTANT_Utf8_info)) {
                     throw new RuntimeException( "What? A local variable table name_index isn't a UTF8 entry?");
                 }
@@ -1610,11 +1581,12 @@ public class CFG {
                     startStmt = (Stmt) units.getFirst();
                 } else {
                     startStmt = instructionToFirstStmt.get(entry.start_inst);
-                    if (entry.end_inst != null) {
-                        endStmt = instructionToFirstStmt.get(entry.end_inst);
+                    // using .prev as end_inst is exclusive
+                    if (entry.end_inst != null && entry.end_inst.prev != null) {
+                        endStmt = instructionToFirstStmt.get(entry.end_inst.prev);
                     }
                 }
-                soot.LocalVariable lv = new LocalVariable(name, entry.index, startStmt, endStmt,
+                soot.LocalVariable lv = new LocalVariable(name, localVariableIndex, startStmt, endStmt,
                         ((CONSTANT_Utf8_info) constant_pool[entry.descriptor_index]).convert());
                 listBody.getLocalVariables().add(lv);
             }
@@ -2818,7 +2790,6 @@ public class CFG {
      * Requires all reachable blocks to have their done flags set to true, and
      * this resets them all back to false;
      * @param bbq queue of BasicBlocks to process.
-     * @see jimpleTargetFixup
      */
     private void processTargetFixup(BBQ bbq)
     {
@@ -2917,7 +2888,6 @@ public class CFG {
 
     /** After the initial jimple construction, a second pass is made to fix up
      * missing Stmt targets for <tt>goto</tt>s, <tt>if</tt>'s etc.
-     * @param c code attribute of this method.
      * @see CFG#jimplify
     */
     void jimpleTargetFixup() 
@@ -4222,10 +4192,26 @@ public class CFG {
             break;
 
          case ByteCode.GOTO:
+	    {
+               // ROBOVM: dkimitsa:
+               // it is a workaround for local variable visibility scope is defined
+               // for GOTO instruction only, which happens when exiting logical scopes.
+               // the workaround is to add dummy nop statement with use box to this variable attachded
+               // this nop scope will be removed later as unused
+               List<ValueBox> boxes = Util.v().getLocalBoxesStartedAtCode(listBody);
+               if (boxes != null)
+                   statements.add(new RoboVmNopStmt(boxes));
+	    }
             stmt = Jimple.v().newGotoStmt(new FutureStmt());
-             break;
+            break;
 
          case ByteCode.GOTO_W:
+	    {
+               // ROBOVM: dkimitsa: check comments to case ByteCode.GOTO:
+               List<ValueBox> boxes = Util.v().getLocalBoxesStartedAtCode(listBody);
+               if (boxes != null)
+                   statements.add(new RoboVmNopStmt(boxes));
+	    }
             stmt = Jimple.v().newGotoStmt(new FutureStmt());
             break;
 /*

@@ -31,6 +31,9 @@
 
 package soot.coffi;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** A debugging attribute, this gives the names of local variables
  * within blocks of bytecode.
  * @see attribute_info
@@ -69,8 +72,7 @@ class LocalVariableTable_attribute extends attribute_info {
          e = local_variable_table[i];
          if (e.index==idx &&
              (code==-1 ||
-	      (code>=e.start_pc && code<=e.start_pc+e.length))){
-	      //  (code>=e.start_pc && code<e.start_pc+e.length))) {
+	      (code>=e.start_pc && code<e.start_pc+e.length))){
             // found the variable, now find its name.
             
             //G.v().out.println("found entry: " + i);
@@ -91,7 +93,41 @@ class LocalVariableTable_attribute extends attribute_info {
       }
       return null;
    }
-   
+
+    // RoboVM note: Start change. finds variable index in local variable table for slot and byte code position
+    public int getLocalVariableIndex(int idx, int code) {
+        // now to find that variable
+        for (int i = 0; i < local_variable_table_length; i++) {
+            local_variable_table_entry e = local_variable_table[i];
+            if (e.index == idx && (code == -1 || (code >= e.start_pc && code < e.start_pc + e.length))) {
+                // found the variable
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Returns list of local variable indexes that start at specific byte code
+     */
+    public List<Integer> getLocalVariablesDefinedAtCode(int code) {
+        // now to find that variable
+        List<Integer> indexes = null;
+        for (int i = 0; i < local_variable_table_length; i++) {
+            local_variable_table_entry e = local_variable_table[i];
+            if (code == e.start_pc) {
+                // found the variable, add it
+                if (indexes == null)
+                    indexes = new ArrayList<>();
+                indexes.add(i);
+            }
+        }
+
+        return indexes;
+    }
+    // RoboVM note: End change.
+
    public String toString()
    {
         StringBuffer buffer = new StringBuffer();

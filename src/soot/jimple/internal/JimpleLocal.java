@@ -26,7 +26,6 @@
 
 package soot.jimple.internal;
 
-import soot.tagkit.*;
 import soot.*;
 import soot.jimple.*;
 import soot.util.*;
@@ -40,7 +39,7 @@ public class JimpleLocal implements Local
     int fixedHashCode;
     boolean isHashCodeChosen;
 
-    int index = -1; // RoboVM note: Added in RoboVM.
+    int variableTableIndex = -1; // RoboVM note: Added in RoboVM.
 
     /** Constructs a JimpleLocal of the given name and type. */
     public JimpleLocal(String name, Type t)
@@ -67,7 +66,7 @@ public class JimpleLocal implements Local
     {
         // RoboVM note: Changed to also clone index.
         JimpleLocal l = new JimpleLocal(name, type);
-        l.index = this.index;
+        l.variableTableIndex = this.variableTableIndex;
         return l;
     }
 
@@ -84,12 +83,23 @@ public class JimpleLocal implements Local
     }
 
     // RoboVM note: Start changes.
-    public int getIndex() {
-        return index;
+    public int getVariableTableIndex() {
+        return variableTableIndex;
     }
 
-    public void setIndex(int index) {
-        this.index = index;
+    public void setVariableTableIndex(int variableTableIndex) {
+        this.variableTableIndex = variableTableIndex;
+    }
+
+    private Set<Integer> sameSlotVariables;
+    @Override
+    public void setSameSlotVariables(Set<Integer> indexes) {
+        this.sameSlotVariables = indexes;
+    }
+
+    @Override
+    public Set<Integer> getSameSlotVariables() {
+        return sameSlotVariables;
     }
     // RoboVM note: End changes.
 
@@ -129,7 +139,7 @@ public class JimpleLocal implements Local
 
     public String toString()
     {
-        return getName();
+        return getName() + ", index=" + variableTableIndex + (sameSlotVariables != null ? ( ", vars=" + sameSlotVariables) : "");
     }
     
     public void toString(UnitPrinter up) {
@@ -150,5 +160,7 @@ public class JimpleLocal implements Local
     public final void setNumber( int number ) { this.number = number; }
 
     private int number = 0;
+
+
 }
 
