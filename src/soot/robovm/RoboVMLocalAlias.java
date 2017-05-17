@@ -9,6 +9,7 @@ import soot.util.Switch;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * @author Demyan Kimitsa
@@ -35,21 +36,25 @@ public class RoboVMLocalAlias extends JimpleLocal {
         super.setVariableTableIndex(variableTableIndex);
     }
 
-    /**
-     *
-     */
+    // registers aliases for group of variables of same type
+    public void addAliases(Set<Integer> varIndexes) {
+        if (aliases == null)
+            aliases = new HashMap<>();
+        for (Integer varIdx : varIndexes) {
+            RoboVMLocalAlias alias = new RoboVMLocalAlias(this.owner, varIdx);
+            alias.setSameSlotVariables(varIndexes);
+            aliases.put(varIdx, alias);
+        }
+    }
+
     public RoboVMLocalAlias getAlias(int variableTableIndex) {
         if (variableTableIndex == getVariableTableIndex())
             return this;
         RoboVMLocalAlias alias = null;
         if (aliases != null)
             alias = aliases.get(variableTableIndex);
-        else
-            aliases = new HashMap<>();
-        if (alias == null) {
-            alias = new RoboVMLocalAlias(this.owner, variableTableIndex);
-            aliases.put(variableTableIndex, alias);
-        }
+        if (alias == null)
+            alias = this;
 
         return alias;
     }
@@ -110,6 +115,7 @@ public class RoboVMLocalAlias extends JimpleLocal {
     public Object clone() {
         Local cloned = (Local) owner.clone();
         cloned.setVariableTableIndex(getVariableTableIndex());
+        cloned.setSameSlotVariables(getSameSlotVariables());
         return cloned;
     }
 

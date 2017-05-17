@@ -306,7 +306,7 @@ public abstract class Body extends AbstractHost implements Serializable
         while (it.hasNext())
         {
             LocalVariable lv = it.next();
-            if (!unitChain.contains(lv.getStartUnit()))
+            if (lv.getStartUnit() != null && !unitChain.contains(lv.getStartUnit()))
                 throw new RuntimeException("start not in chain"+" in "+getMethod());
 
             if (lv.getEndUnit() != null && !unitChain.contains(lv.getEndUnit()))

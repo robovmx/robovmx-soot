@@ -831,19 +831,44 @@ swtch:
     }
 
     // RoboVM note: returns list of local's value boxes which usage STARTS at activeOriginalIndex
-    List<ValueBox> getLocalBoxesStartedAtCode(JimpleBody listBody) {
-        if (activeOriginalIndex == -1 || activeVariableTable == null)
-            return null;
-        List<Integer> indexes = activeVariableTable.getLocalVariablesDefinedAtCode(activeOriginalIndex);
-        if (indexes == null)
-            return null;
-        List<ValueBox> locals = new ArrayList<>();
-        for (Integer idx : indexes) {
-            int slotIndex = activeVariableTable.local_variable_table[idx].index;
-            locals.add(new ImmediateBox(getLocalForIndex(listBody, slotIndex)));
+    public void preAllocateLocals(JimpleBody listBody, int startSlotIndex) {
+        if (activeVariableTable == null)
+            return;
+        Map<Integer, Map<String, Set<Integer>>> localMap = new HashMap<>();
+        for (int idx = 0; idx < activeVariableTable.local_variable_table_length; idx++) {
+            local_variable_table_entry e = activeVariableTable.local_variable_table[idx];
+            int slotIndex = e.index;
+            if (slotIndex < startSlotIndex)
+                continue;
+            String type = ((CONSTANT_Utf8_info)(activeConstantPool[e.descriptor_index])).convert();
+            Map<String, Set<Integer>> localsOfSlot = localMap.get(slotIndex);
+            if (localsOfSlot == null) {
+                localsOfSlot = new HashMap<>();
+                localMap.put(slotIndex, localsOfSlot);
+            }
+
+            Set<Integer> localsOfType = localsOfSlot.get(type);
+            if (localsOfType == null) {
+                localsOfType = new HashSet<>();
+                localsOfSlot.put(type, localsOfType);
+            }
+
+            localsOfType.add(idx);
         }
-        return locals;
+
+        // now create locals
+        for (Map.Entry<Integer, Map<String, Set<Integer>>> e : localMap.entrySet()) {
+            int slotIndex = e.getKey();
+            String name = "l" + slotIndex;
+            Local l = Jimple.v().newLocal(name, UnknownType.v());
+            RoboVMLocalAlias slotLocal = new RoboVMLocalAlias(l, -1);
+            listBody.getLocals().add(slotLocal);
+            // and add aliases grouped by type
+            for (Set<Integer> varIndexes : e.getValue().values())
+                slotLocal.addAliases(varIndexes);
+        }
     }
+
     // RoboVM note: End change.
 
     Local getLocalForIndex(JimpleBody listBody, int index)

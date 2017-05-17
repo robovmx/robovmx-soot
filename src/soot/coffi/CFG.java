@@ -1018,6 +1018,7 @@ public class CFG {
                 }
             }
 
+            Util.v().preAllocateLocals(listBody, currentLocalIndex); // ROBOVM: dkimitsa: added
             Util.v().resetEasyNames();
         }
 
@@ -1574,18 +1575,20 @@ public class CFG {
                 String name = ((CONSTANT_Utf8_info) (constant_pool[entry.name_index])).convert();
                 Stmt startStmt = null;
                 Stmt endStmt = null;
-                if (entry.start_inst == firstInstruction && entry.end_inst == null) {
-                    // Parameter. Make sure the LocalVariable extends from the
-                    // start of the method before the parameters are assigned to
-                    // locals in the IdentityStmts inserted in jimplify(...).
-                    startStmt = (Stmt) units.getFirst();
-                } else {
-                    startStmt = instructionToFirstStmt.get(entry.start_inst);
-                    // using .prev as end_inst is exclusive
-                    if (entry.end_inst != null && entry.end_inst.prev != null) {
-                        endStmt = instructionToFirstStmt.get(entry.end_inst.prev);
-                    }
-                }
+                if (entry.length > 0) {
+			if (entry.start_inst == firstInstruction && entry.end_inst == null) {
+				// Parameter. Make sure the LocalVariable extends from the
+				// start of the method before the parameters are assigned to
+				// locals in the IdentityStmts inserted in jimplify(...).
+				startStmt = (Stmt) units.getFirst();
+			} else {
+				startStmt = instructionToFirstStmt.get(entry.start_inst);
+				// using .prev as end_inst is exclusive
+				if (entry.end_inst != null && entry.end_inst.prev != null) {
+					endStmt = instructionToFirstStmt.get(entry.end_inst.prev);
+				}
+			}
+		}
                 soot.LocalVariable lv = new LocalVariable(name, localVariableIndex, startStmt, endStmt,
                         ((CONSTANT_Utf8_info) constant_pool[entry.descriptor_index]).convert());
                 listBody.getLocalVariables().add(lv);
@@ -4192,26 +4195,10 @@ public class CFG {
             break;
 
          case ByteCode.GOTO:
-	    {
-               // ROBOVM: dkimitsa:
-               // it is a workaround for local variable visibility scope is defined
-               // for GOTO instruction only, which happens when exiting logical scopes.
-               // the workaround is to add dummy nop statement with use box to this variable attachded
-               // this nop scope will be removed later as unused
-               List<ValueBox> boxes = Util.v().getLocalBoxesStartedAtCode(listBody);
-               if (boxes != null)
-                   statements.add(new RoboVmNopStmt(boxes));
-	    }
             stmt = Jimple.v().newGotoStmt(new FutureStmt());
             break;
 
          case ByteCode.GOTO_W:
-	    {
-               // ROBOVM: dkimitsa: check comments to case ByteCode.GOTO:
-               List<ValueBox> boxes = Util.v().getLocalBoxesStartedAtCode(listBody);
-               if (boxes != null)
-                   statements.add(new RoboVmNopStmt(boxes));
-	    }
             stmt = Jimple.v().newGotoStmt(new FutureStmt());
             break;
 /*

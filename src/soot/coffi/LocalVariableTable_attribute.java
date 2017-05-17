@@ -72,7 +72,8 @@ class LocalVariableTable_attribute extends attribute_info {
          e = local_variable_table[i];
          if (e.index==idx &&
              (code==-1 ||
-	      (code>=e.start_pc && code<e.start_pc+e.length))){
+             (e.length == 0 && code == e.start_pc) ||
+             (code>=e.start_pc && code<e.start_pc+e.length))){
             // found the variable, now find its name.
             
             //G.v().out.println("found entry: " + i);
@@ -99,32 +100,14 @@ class LocalVariableTable_attribute extends attribute_info {
         // now to find that variable
         for (int i = 0; i < local_variable_table_length; i++) {
             local_variable_table_entry e = local_variable_table[i];
-            if (e.index == idx && (code == -1 || (code >= e.start_pc && code < e.start_pc + e.length))) {
+            // dkimitsa: fix for local variable that has no code length
+            if (e.index == idx && (code == -1 || (e.length == 0 && code == e.start_pc) || (code >= e.start_pc && code < e.start_pc + e.length))) {
                 // found the variable
                 return i;
             }
         }
 
         return -1;
-    }
-
-    /**
-     * Returns list of local variable indexes that start at specific byte code
-     */
-    public List<Integer> getLocalVariablesDefinedAtCode(int code) {
-        // now to find that variable
-        List<Integer> indexes = null;
-        for (int i = 0; i < local_variable_table_length; i++) {
-            local_variable_table_entry e = local_variable_table[i];
-            if (code == e.start_pc) {
-                // found the variable, add it
-                if (indexes == null)
-                    indexes = new ArrayList<>();
-                indexes.add(i);
-            }
-        }
-
-        return indexes;
     }
     // RoboVM note: End change.
 

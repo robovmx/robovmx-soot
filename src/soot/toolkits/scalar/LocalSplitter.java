@@ -197,64 +197,29 @@ public class LocalSplitter extends BodyTransformer
                 ValueBox rep = (ValueBox) web.get(0);
                 Local desiredLocal = (Local) rep.getValue();
 
-                if(!localToUseCount.containsKey(desiredLocal))
+                // dkimitsa: for local with variable table index attached there is required to do split
+                // as this variable is only alias and not attached to body yet and split will attach it
+                int useCount = localToUseCount.containsKey(desiredLocal) ?  localToUseCount.get(desiredLocal) : 0;
+                if(useCount == 0 && desiredLocal.getVariableTableIndex() == -1)
                 {
-                    // claim this local for this set
-
-                    localToUseCount.put(desiredLocal, new Integer(1));
-
-                    // ROBOVM: dkimitsa: all variables in web is going to be replaced with one variables
-                    // this change is collecting all variableTableIndexes and saving them to one local
-                    // variable that stays
-                    {
-                        Set<Integer> localVarIdxs = new HashSet<>();
-                        Iterator j = web.iterator();
-
-                        while(j.hasNext())
-                        {
-                            ValueBox box = (ValueBox) j.next();
-                            Local l = (Local) box.getValue();
-                            box.setValue(desiredLocal);
-
-                            if (l.getVariableTableIndex() != -1)
-                                localVarIdxs.add(l.getVariableTableIndex());
-
-                        }
-
-                        if (!localVarIdxs.isEmpty())
-                            desiredLocal.setSameSlotVariables(localVarIdxs);
-                    }
-
-                }
-                else {
+                    localToUseCount.put(desiredLocal, 1);
+                } else {
                     // generate a new local
-
-                    int useCount = localToUseCount.get(desiredLocal).intValue() + 1;
-                    localToUseCount.put(desiredLocal, new Integer(useCount));
+                    useCount += 1;
+                    localToUseCount.put(desiredLocal, useCount);
         
                     Local local = (Local) desiredLocal.clone();
                     local.setName(desiredLocal.getName() + "#" + useCount);
-                    
                     body.getLocals().add(local);
 
                     // Change all boxes to point to this new local
                     {
                         Iterator j = web.iterator();
-                        Set<Integer> localVarIdxs = new HashSet<>();
-
                         while(j.hasNext())
                         {
                             ValueBox box = (ValueBox) j.next();
-                            Local l = (Local) box.getValue();
                             box.setValue(local);
-
-                            // update map of varaible indexes
-                            if (l.getVariableTableIndex() != -1)
-                                localVarIdxs.add(l.getVariableTableIndex());
                         }
-
-                        if (!localVarIdxs.isEmpty())
-                            local.setSameSlotVariables(localVarIdxs);
                     }
                 }
             }

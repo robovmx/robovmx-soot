@@ -139,7 +139,8 @@ public class JimpleLocal implements Local
 
     public String toString()
     {
-        return getName() + ", index=" + variableTableIndex + (sameSlotVariables != null ? ( ", vars=" + sameSlotVariables) : "");
+        return getName() + (variableTableIndex != -1 ? (", index=" + variableTableIndex) : "") +
+                (sameSlotVariables != null ? ( ", vars=" + sameSlotVariables) : "");
     }
     
     public void toString(UnitPrinter up) {
