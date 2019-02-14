@@ -74,16 +74,6 @@ public class LocalSplitter extends BodyTransformer
         if(Options.v().time())
                 Timers.v().splitPhase1Timer.start();
 
-        // RoboVM added: ignore parameters locals in split
-        Set<Local> parameterLocals = new HashSet<>();
-        for (Unit u : body.getUnits()) {
-            if (u instanceof IdentityStmt && ((IdentityStmt)u).getRightOp() instanceof ParameterRef &&
-                    ((IdentityStmt)u).getLeftOpBox().getValue() instanceof Local) {
-                Local l = (Local)((IdentityStmt)u).getLeftOpBox().getValue();
-                parameterLocals.add(l);
-            }
-        }
-
 
             // Go through the definitions, building the webs
         {
@@ -120,7 +110,7 @@ public class LocalSplitter extends BodyTransformer
                 Value lo = loBox.getValue();
 
                 // RoboVM added: skip spliting locals that are paramer one
-                if(lo instanceof Local && !markedBoxes.contains(loBox) && !parameterLocals.contains(lo))
+                if(lo instanceof Local && !markedBoxes.contains(loBox))
                 {
                     LinkedList<Unit> defsToVisit = new LinkedList<Unit>();
                     LinkedList<ValueBox> boxesToVisit = new LinkedList<ValueBox>();
