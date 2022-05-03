@@ -705,7 +705,20 @@ public class ClassFile {
         ea.method_index = d.readUnsignedShort();
         a = (attribute_info)ea;
      }
-         else if(s.compareTo(attribute_info.InnerClasses)==0)
+     else if (s.compareTo(attribute_info.NestHost)==0){
+        NestHost_attribute ea = new NestHost_attribute();
+        ea.class_index = d.readUnsignedShort();
+        a = (attribute_info)ea;
+     }
+     else if (s.compareTo(attribute_info.NestMembers)==0){
+         NestMembers_attribute ea = new NestMembers_attribute();
+         int number_of_classes = d.readUnsignedShort();
+         ea.classes = new int[number_of_classes];
+         for (int idx = 0; idx < number_of_classes; idx++)
+             ea.classes[idx] = d.readUnsignedShort();
+         a = (attribute_info)ea;
+     }
+     else if(s.compareTo(attribute_info.InnerClasses)==0)
 	 {
 	    InnerClasses_attribute ia = new InnerClasses_attribute();
 	    ia.inner_classes_length = d.readUnsignedShort();

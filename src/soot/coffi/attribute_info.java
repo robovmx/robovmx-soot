@@ -91,7 +91,17 @@ class attribute_info {
     * @see EnclosingMethod_attribute
     */
    public static final String EnclosingMethod = "EnclosingMethod";
-   
+
+   /** String by which a NestMembers attribute is recognized.
+    * @see NestMembers_attribute
+    */
+   public static final String NestMembers = "NestMembers";
+
+   /** String by which a NestHost attribute is recognized.
+    * @see NestHost_attribute
+    */
+   public static final String NestHost = "NestHost";
+
    /** String by which a LocalVariableTypeTable attribute is recognized.
     * @see LocalVariableTypeTable_attribute
     */

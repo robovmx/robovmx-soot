@@ -409,6 +409,18 @@ public class Util
             }
             bclass.addTag(new EnclosingMethodTag(class_name, method_name, method_sig));
         }
+        else if (coffiClass.attributes[i] instanceof NestHost_attribute) {
+            NestHost_attribute attr = (NestHost_attribute)coffiClass.attributes[i];
+            String nest_host_class = ((CONSTANT_Utf8_info)coffiClass.constant_pool[((CONSTANT_Class_info)coffiClass.constant_pool[ attr.class_index]).name_index]).convert();
+            bclass.addTag(new NestHostTag(nest_host_class));
+        }
+        else if (coffiClass.attributes[i] instanceof NestMembers_attribute) {
+            NestMembers_attribute attr = (NestMembers_attribute)coffiClass.attributes[i];
+            String[] members = new String[attr.classes.length];
+            for (int idx = 0; idx < members.length; idx++)
+                members[idx] = ((CONSTANT_Utf8_info)coffiClass.constant_pool[((CONSTANT_Class_info)coffiClass.constant_pool[ attr.classes[idx]]).name_index]).convert();
+            bclass.addTag(new NestMembersTag(members));
+        }
         else if (coffiClass.attributes[i] instanceof RuntimeVisibleAnnotations_attribute || coffiClass.attributes[i] instanceof RuntimeInvisibleAnnotations_attribute)
         {
             addAnnotationVisibilityAttribute(bclass, coffiClass.attributes[i], coffiClass, references);
